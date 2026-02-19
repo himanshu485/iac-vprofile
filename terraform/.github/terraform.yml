@@ -1,65 +1,63 @@
 name: "vprofile IAC"
 on:
   push:
-     branches:
-        -main
-        -stages
-     paths:
-        -terraorm/**
+    branches:
+      - main
+      - stages
+    paths:
+      - terraform/**
   pull_request:
     branches:
-      -main
+      - main
     paths:
-       -terraform/**
-
+      - terraform/**
 
 env:
- # creidentials for deploying to AWS 
- AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
- AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY }}
- # S3 bucket for storing teraform state files
- BUCKET_TF_STATE: ${{ secrets.BUCKET_TF_STATE }}
- # AWS region for deploying reources
- AWS_REGION: us-east-1
- EKS_CLUSTER: vprofie17-eks
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  BUCKET_TF_STATE: ${{ secrets.BUCKET_TF_STATE }}
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: vprofie17-eks
 
 jobs:
-   terraform:
-    name: "Apply terraform code chnages"
+  terraform:
+    name: "Apply terraform code changes"
     runs-on: ubuntu-latest
     defaults:
       run:
-       shell: bash
-       working-directory: ./terraform
+        shell: bash
+        working-directory: ./terraform
 
     steps:
-     - name: checkout source code
-       uses: action/checkout@v4
-       
-     - name: setup teraform with specified version on the runner 
-       uses: hashicorp/setup-terraform@v2
-       with:
-        terraform_version: 1.1.7
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-       name: terraform init
-       id: init
-       run: terraform init -backend-config="bucket= $BUCKET_TF_STATE "
-      
-       name: terraform format
-       id: fmt
-       run: terraform fmt -check
+      - name: Setup Terraform with specified version
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.1.7
 
-       name: terraform validate
-       id: validate
-       run: teraaform validate
+      - name: Terraform init
+        id: init
+        run: terraform init -backend-config="bucket=${BUCKET_TF_STATE}"
 
+      - name: Terraform format
+        id: fmt
+        run: terraform fmt -check
 
-       name: terraform plan
-       id: plan
-       run: terraform plan -no-color -out planfile -input=false
-       continues-on-error: true
+      - name: Terraform validate
+        id: validate
+        run: terraform validate
 
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -no-color -out planfile -input=false
+        continue-on-error: true
 
-       name: terraform plan status
-       if: steps.plan.outcome == 'failure'
-       run: exit 1      
+      - name: Terraform plan status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -no-color planfile    
